@@ -174,9 +174,6 @@ private
   end
   
   def get_location(callsign, result)
-    # FIXME: FCC website down due to government shutdown...
-    return [Random.rand(50...450), 14.5, 16.8]
-    
     # facid: facility id number
     # call: callsign of station
     # chan: lower bound on channel number to search
