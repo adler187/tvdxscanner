@@ -271,7 +271,7 @@ password = ARGV[2]
 
 threads = []
 HDHomeRun.discover.each do |tuner|
-  for i in 0..tuner[:tuner_count]-1
+  tuner[:tuner_count].times do |i|
     begin
       resource = RestClient::Resource.new("#{server}/tuners/#{tuner[:id]}/#{i}", :user => username, :password => password)
       response = resource.get(:accept => :json)
@@ -282,7 +282,11 @@ HDHomeRun.discover.each do |tuner|
     tuner = JSON.parse response
     
     threads << Thread.new(tuner) do |tuner|
-      Scanner.new(tuner, server, username, password).scan
+      scanner = Scanner.new(tuner, server, username, password)
+      while true
+        scanner.scan
+        sleep 600
+      end
     end
   end
 end
