@@ -45,7 +45,7 @@ class Scanner
           :signal_to_noise => result.status.signal_to_noise,
           :signal_quality => result.status.symbol_error_rate,
           :station_id => station['id'],
-          :tuner_id => @config['tuner_id']
+          :tuner_id => @config['id']
         }
         
         resource = RestClient::Resource.new("#{@server}/logs", :user => @username, :password => @password)
@@ -96,7 +96,7 @@ private
   
   def new_station(result)
     if result.tsid == '0x0001'
-      puts "Received a station with an invalid tsid #{result.tsid} on rf channel #{result.channel}, display channel #{program(result).major}, station IDs as #{program(result).name}, at #{scan_time}"
+      puts "Received a station with an invalid tsid #{result.tsid} on rf channel #{result.channel}, display channel #{program(result).major}, station IDs as #{program(result).name}, at #{@scan_time}"
       puts "This is most likely a translator that has not been properly set up correctly"
       puts "You can add this station manually, but note that the tsid might change in the future when it gets set properly and will be re-added"
       puts "Signal: #{result.status.signal_strength}, SNR: #{result.status.signal_to_noise}, SER: #{result.status.symbol_error_rate}"
