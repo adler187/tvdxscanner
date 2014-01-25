@@ -6,6 +6,8 @@ require 'ffi-hdhomerun'
 require 'open-uri'
 require 'rest-client'
 
+class ContinueException < Exception; end
+
 class Scanner
   def initialize(config, server, username, password)
     @config = config
@@ -33,13 +35,11 @@ class Scanner
     @tuner.scan do |result|
       next if result.program_count <= 0
       
-      puts "#{@config['name']} found station: #{program(result).name} with virtual channel #{program(result).major}. Using PSIP program number #{program(result).number}"
-      
-      station = get_station(result)
-      
-      next if station.nil?
-      
       begin
+        puts "#{@config['name']} found station: #{program(result).name} with virtual channel #{program(result).major}. Using PSIP program number #{program(result).number}"
+        
+        station = get_station(result)
+      
         log_entry = {
           :signal_strength => result.status.signal_strength,
           :signal_to_noise => result.status.signal_to_noise,
@@ -50,17 +50,22 @@ class Scanner
         
         resource = RestClient::Resource.new("#{@server}/logs", :user => @username, :password => @password)
         response = resource.post({:log => log_entry}.to_json, :content_type => :json, :accept => :json)
-        
         json = JSON.parse response
         
         if json['success']
           log_entry = json['log']
+          puts "Created log ##{log_entry['id']}"
+        else
+          # TODO: print error here
         end
-        puts "Created log ##{log_entry['id']}"
+      rescue ContinueException => e
+        next
       rescue Exception => e
         # TODO: Add proper logging here
-        puts "Caught exception #{e.class} at line #{__LINE__}"
-        puts e
+        puts "Caught exception #{e.class}: #{e}"
+          puts station.class
+          p station
+        puts e.backtrace
         next
       end
     end
@@ -72,8 +77,6 @@ private
   end
   
   def get_station(result)
-    station = nil
-    
     begin
       resource = RestClient::Resource.new("#{@server}/stations?tsid=#{result.tsid}&display=#{program(result).major}&rf=#{result.channel}", :user => @username, :password => @password)
       response = resource.get(:accept => :json)
@@ -84,14 +87,12 @@ private
     json = JSON.parse response
     
     if json.length > 1
-      puts "Invalid number of results for station: #{json.length}"
+      raise ContinueException, "Invalid number of results for station: #{json.length}"
     elsif json.length == 0
-      station = new_station(result)
+      return new_station(result)
     else
-      station = json[0]['station']
+      return json[0]['station']
     end
-    
-    station
   end
   
   def new_station(result)
@@ -100,7 +101,7 @@ private
       puts "This is most likely a translator that has not been properly set up correctly"
       puts "You can add this station manually, but note that the tsid might change in the future when it gets set properly and will be re-added"
       puts "Signal: #{result.status.signal_strength}, SNR: #{result.status.signal_to_noise}, SER: #{result.status.symbol_error_rate}"
-      return
+      raise ContinueException, "Invalid tsid"
     end
     
     callsign = get_callsign(result)
@@ -143,13 +144,9 @@ private
     else
       puts "getting callsign from rabbitears for tsid #{result.tsid}"
     end
-      
-    begin
-      response = RestClient.get 'http://www.rabbitears.info/oddsandends.php?request=tsid'
-    rescue => e
-      p e.response
-      return nil
-    end
+    
+    response = RestClient.get 'http://www.rabbitears.info/oddsandends.php?request=tsid'
+
     # TODO: log results for later
 
     if data_match = response.match(/<td>#{result.tsid}&nbsp;<\/td><td><a href=(?:'|")\/market\.php\?request=station_search&callsign=\d+(?:'|")>((?:[CWKX][A-Z]{2,3})|(?:[KW]\d{1,2}[A-Z]{2}))(?:-(?:(?:TV)|(?:DT)))?<\/a>&nbsp;<\/td><td align='right'>(\d+)(?:&nbsp;)*<\/td><td align='right'>(\d+)/)
@@ -162,12 +159,12 @@ private
       unless(realrf == result.channel && realdisp.to_i == program(result).major.to_i)
         puts "Found a translator of #{callsign}(#{result.tsid}). IDs as #{program(result).name}, RF channel #{result.channel}, display channel #{program(result).major} at #{@scan_time}, add manually"
         puts "Signal: #{result.status.signal_strength}, SNR: #{result.status.signal_to_noise}, SER: #{result.status.symbol_error_rate}"
-        return nil
+        raise ContinueException, "Found a translator, need to add manually"
       end
     else
       puts "Couldn't find callsign for tsid #{result.tsid} on channel #{result.channel}, display channel #{program(result).major}, station IDs as #{program(result).name}, at #{@scan_time}, add manually"
       puts "Signal: #{result.status.signal_strength}, SNR: #{result.status.signal_to_noise}, SER: #{result.status.symbol_error_rate}"
-      return nil
+      raise ContinueException, "Unknown tsid"
     end
     
     callsign
@@ -180,12 +177,7 @@ private
     # cha2: upper bound on channel number to search
     # type: (3) Only licenced stations, no CPs or pending aps
     # list: (4) Text ouput, pipe delimited
-    begin
-      response = RestClient.get "http://www.fcc.gov/fcc-bin/tvq?call=#{callsign}&chan=#{result.channel}&cha2=#{result.channel}&list=4"
-    rescue => e
-      p e.response
-      return
-    end
+    response = RestClient.get "http://www.fcc.gov/fcc-bin/tvq?call=#{callsign}&chan=#{result.channel}&cha2=#{result.channel}&list=4"
     # TODO: log results for later
     
     lines = response.strip.split("\n")
@@ -193,7 +185,7 @@ private
     if lines.length == 0
       puts "Found a translator of callsign on channel #{result.channel} at #{@scan_time}, add manually"
       puts "Signal: #{result.status.signal_strength}, SNR: #{result.status.signal_to_noise}, SER: #{result.status.symbol_error_rate}"
-      return
+      raise ContinueException, "Found a translator"
     end
 
     lines.each do |line|
