@@ -24,8 +24,8 @@ class Scanner
       return
     end
     
-    @latitude = config['info']['lattitude']
-    @longitude = config['info']['longitude']
+    @latitude = config['info']['lattitude'].to_f
+    @longitude = config['info']['longitude'].to_f
   end
 
   def scan
