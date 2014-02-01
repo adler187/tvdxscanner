@@ -153,8 +153,6 @@ private
       callsign = data_match[1]
       realdisp = data_match[2]
       realrf = data_match[3]
-      
-      puts "#{realrf}, #{result.channel}, #{realdisp}, #{program(result).major},"
 
       unless(realrf == result.channel && realdisp.to_i == program(result).major.to_i)
         puts "Found a translator of #{callsign}(#{result.tsid}). IDs as #{program(result).name}, RF channel #{result.channel}, display channel #{program(result).major} at #{@scan_time}, add manually"
@@ -232,7 +230,6 @@ private
       asrn,
       agl = tokens
 
-      p tokens
       if lic_type.match(/STA/)
         next
       end
