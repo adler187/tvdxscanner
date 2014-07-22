@@ -288,8 +288,10 @@ HDHomeRun.discover.each do |tuner|
     threads << Thread.new(tuner_info) do |tuner_info|
       scanner = Scanner.new(tuner_info, server, username, password)
       while true
-          scanner.scan
-        sleep tuner_info[:scan_interval]*60
+        scan_interval = tuner_info[:scan_interval].to_i * 60
+        
+        scanner.scan
+        sleep scan_interval
       end
     end
   end
