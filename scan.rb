@@ -261,7 +261,7 @@ password = ARGV[2]
 
 
 default_config = {
-  scan_interval: 10
+  'scan_interval' => 10
 }
 
 threads = []
@@ -288,7 +288,7 @@ HDHomeRun.discover.each do |tuner|
     threads << Thread.new(tuner_info) do |tuner_info|
       scanner = Scanner.new(tuner_info, server, username, password)
       while true
-        scan_interval = tuner_info[:scan_interval].to_i * 60
+        scan_interval = tuner_info['scan_interval'].to_i * 60
         
         scanner.scan
         sleep scan_interval
