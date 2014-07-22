@@ -24,8 +24,8 @@ class Scanner
       return
     end
     
-    @latitude = config['info']['lattitude'].to_f
-    @longitude = config['info']['longitude'].to_f
+    @latitude = config['latitude'].to_f
+    @longitude = config['longitude'].to_f
   end
 
   def scan
@@ -186,6 +186,8 @@ private
       raise ContinueException, "Found a translator"
     end
 
+    latitude = longitude = distance = nil
+    
     lines.each do |line|
       tokens = line.split('|')
       tokens.each_index do |i|
@@ -243,6 +245,8 @@ private
         break
       end
     end
+    
+    return [distance, latitude, longitude]
   end
 end
 
@@ -255,28 +259,42 @@ server = ARGV[0]
 username = ARGV[1]
 password = ARGV[2]
 
+
+default_config = {
+  scan_interval: 10
+}
+
 threads = []
 HDHomeRun.discover.each do |tuner|
   tuner[:tuner_count].times do |i|
     begin
-      resource = RestClient::Resource.new("#{server}/tuners/#{tuner[:id]}/#{i}", :user => username, :password => password)
+      url = "#{server}/tuners/#{tuner[:id]}/#{i}"
+      resource = RestClient::Resource.new(url, :user => username, :password => password)
       response = resource.get(:accept => :json)
     rescue => e
-      next
     end
     
-    tuner = JSON.parse response
+    tuner_info = default_config.merge(JSON.parse(response))
     
-    threads << Thread.new(tuner) do |tuner|
-      scanner = Scanner.new(tuner, server, username, password)
+    if tuner_info['info'].is_a? Hash
+      info = tuner_info['info']
+      tuner_info.delete 'info'
+      tuner_info = info.merge(tuner_info)
+      
+      tuner_info['latitude'] = tuner_info['lattitude']
+      tuner_info.delete 'lattitude'
+    end
+    
+    threads << Thread.new(tuner_info) do |tuner_info|
+      scanner = Scanner.new(tuner_info, server, username, password)
       while true
-        scanner.scan
-        sleep 600
+          scanner.scan
+        sleep tuner_info[:scan_interval]*60
       end
     end
   end
 end
-
+# 
 threads.each do |thread|
   thread.join
 end
