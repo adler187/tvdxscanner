@@ -272,6 +272,7 @@ HDHomeRun.discover.each do |tuner|
       resource = RestClient::Resource.new(url, :user => username, :password => password)
       response = resource.get(:accept => :json)
     rescue => e
+      next
     end
     
     tuner_info = default_config.merge(JSON.parse(response))
