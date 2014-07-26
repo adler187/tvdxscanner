@@ -32,42 +32,47 @@ class Scanner
     # log all output from scan, note when calls and all-time new calls are found
     @scan_time = Time.now.strftime('%Y-%m-%d %T')
     
-    @tuner.scan do |result|
-      next if result.program_count <= 0
-      
-      begin
-        puts "#{@config['name']} found station: #{program(result).name} with virtual channel #{program(result).major}. Using PSIP program number #{program(result).number}"
+    begin
+      @tuner.scan do |result|
+        next if result.program_count <= 0
         
-        station = get_station(result)
-      
-        log_entry = {
-          :signal_strength => result.status.signal_strength,
-          :signal_to_noise => result.status.signal_to_noise,
-          :signal_quality => result.status.symbol_error_rate,
-          :station_id => station['id'],
-          :tuner_id => @config['id']
-        }
+        begin
+          puts "#{@config['name']} found station: #{program(result).name} with virtual channel #{program(result).major}. Using PSIP program number #{program(result).number}"
+          
+          station = get_station(result)
         
-        resource = RestClient::Resource.new("#{@server}/logs", :user => @username, :password => @password)
-        response = resource.post({:log => log_entry}.to_json, :content_type => :json, :accept => :json)
-        json = JSON.parse response
-        
-        if json['success']
-          log_entry = json['log']
-          puts "Created log ##{log_entry['id']}"
-        else
-          # TODO: print error here
-        end
-      rescue ContinueException => e
-        next
-      rescue Exception => e
-        # TODO: Add proper logging here
-        puts "Caught exception #{e.class}: #{e}"
+          log_entry = {
+            :signal_strength => result.status.signal_strength,
+            :signal_to_noise => result.status.signal_to_noise,
+            :signal_quality => result.status.symbol_error_rate,
+            :station_id => station['id'],
+            :tuner_id => @config['id']
+          }
+          
+          resource = RestClient::Resource.new("#{@server}/logs", :user => @username, :password => @password)
+          response = resource.post({:log => log_entry}.to_json, :content_type => :json, :accept => :json)
+          json = JSON.parse response
+          
+          if json['success']
+            log_entry = json['log']
+            puts "Created log ##{log_entry['id']}"
+          else
+            # TODO: print error here
+          end
+        rescue ContinueException => e
+          next
+        rescue Exception => e
+          # TODO: Add proper logging here
+          puts "Caught exception at #{Time.now}, #{e.class}: #{e}"
           puts station.class
           p station
-        puts e.backtrace
-        next
+          puts e.backtrace
+          next
+        end
       end
+    rescue Exception => e
+      puts "Caught exception at #{Time.now}, #{e.class}: #{e}"
+      puts e.backtrace
     end
   end
   
